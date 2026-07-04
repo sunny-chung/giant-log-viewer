@@ -1,13 +1,16 @@
-import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+//import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import io.github.kdroidfilter.nucleus.desktop.application.dsl.TargetFormat
 import java.io.ByteArrayOutputStream
 import java.util.Properties
 
 plugins {
-    kotlin("multiplatform") version "2.0.20"
+    kotlin("multiplatform") version "2.3.20"
     id("org.jetbrains.compose") version "1.6.11"
 //    kotlin("jvm") version "2.0.20"
-    kotlin("plugin.compose") version "2.0.20"
-    kotlin("plugin.serialization") version "2.0.20"
+    kotlin("plugin.compose") version "2.3.20"
+    kotlin("plugin.serialization") version "2.3.20"
+
+    id("io.github.kdroidfilter.nucleus") version "1.15.7"
 }
 
 group = "com.sunnychung.application"
@@ -20,7 +23,7 @@ repositories {
 }
 
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(25)
     jvm()
     sourceSets {
         val jvmMain by getting {
@@ -54,8 +57,8 @@ compose.resources {
     generateResClass = always
 }
 
-compose.desktop {
-    application {
+nucleus.application {
+//compose.desktop.application {
         val distributionVersion = "^(\\d+\\.\\d+\\.\\d+).*".toRegex()
             .matchEntire(project.version.toString())!!
             .groupValues[1]
@@ -72,6 +75,8 @@ compose.desktop {
             copyright = "© 2025 Sunny Chung"
             packageVersion = distributionVersion
 
+            enableAotCache = true
+
             macOS {
                 iconFile.set(project.file("appicon/appicon.icns"))
             }
@@ -84,21 +89,18 @@ compose.desktop {
         }
 
         buildTypes.release.proguard {
-            version.set("7.5.0")
+            version.set("7.9.0")
             configurationFiles.from(project.file("proguard.pro"))
         }
-    }
+//    }
 }
 
 // BEGIN Create build info properties
 
 fun getGitCommitHash(): String {
-    val stdout = ByteArrayOutputStream()
-    rootProject.exec {
+    return providers.exec {
         commandLine("git", "rev-parse", "--short", "HEAD")
-        standardOutput = stdout
-    }
-    return stdout.toString().trim()
+    }.standardOutput.asText.get().trim()
 }
 
 tasks.create("createBuildProperties") {

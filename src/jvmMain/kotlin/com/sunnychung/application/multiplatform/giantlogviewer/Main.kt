@@ -9,12 +9,15 @@ import com.sunnychung.application.giantlogviewer.generated.resources.appicon
 import com.sunnychung.application.multiplatform.giantlogviewer.extension.setMinimumSize
 import com.sunnychung.application.multiplatform.giantlogviewer.manager.AppContext
 import com.sunnychung.application.multiplatform.giantlogviewer.ux.App
+import com.sunnychung.lib.multiplatform.kdatetime.KZonedInstant
 import kotlinx.coroutines.runBlocking
 import net.harawata.appdirs.AppDirsFactory
 import org.jetbrains.compose.resources.painterResource
 import java.io.File
 
 fun main(args: Array<String>) {
+    val startAppInstant = KZonedInstant.nowAtLocalZoneOffset()
+    log("[$startAppInstant] start app")
     System.setProperty("apple.awt.application.appearance", "system")
 
     val appDir = AppDirsFactory.getInstance().getUserDataDir("Giant Log Viewer", null, null)
@@ -23,7 +26,16 @@ fun main(args: Array<String>) {
         AppContext.instance.ResourceManager.loadAllResources()
     }
 
+    KZonedInstant.nowAtLocalZoneOffset().let { now ->
+        log("[$now] (${now - startAppInstant}) pre loaded app")
+    }
+
     application {
+
+        KZonedInstant.nowAtLocalZoneOffset().let { now ->
+            log("[$now] (${now - startAppInstant}) app scope")
+        }
+
         Window(
             onCloseRequest = ::exitApplication,
             title = "Giant Log Viewer",
@@ -31,6 +43,14 @@ fun main(args: Array<String>) {
         ) {
             setMinimumSize(250.dp, 150.dp)
             App()
+
+            KZonedInstant.nowAtLocalZoneOffset().let { now ->
+                log("[$now] (${now - startAppInstant}) after app")
+            }
         }
     }
+}
+
+fun log(msg: String) {
+    File("C:/Users/Sunny/tmp/timeLog.log").appendText("$msg\n")
 }
