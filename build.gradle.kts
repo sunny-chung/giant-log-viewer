@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "com.sunnychung.application"
-version = "1.3.0-SNAPSHOT"
+version = "2.0.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
