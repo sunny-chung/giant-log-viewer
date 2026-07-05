@@ -43,7 +43,28 @@ jobs:
           java-version: '21'
       - run: ./gradlew clean createReleaseDistributable
       - run: pushd ./build/compose/binaries && dir && cd main-release && dir && popd
-      - run: pushd ./build/compose/binaries/main-release/app && dir && tar -acf "app.zip" "Giant Log Viewer" && move "app.zip" "../../../../../GiantLogViewer-${{ github.ref_name }}-windows-${{ runner.arch }}.zip" && popd
+      - run: pushd ./build/compose/binaries/main-release/app && dir && tar -acf "app.zip" "Giant Log Viewer" && move "app.zip" "../../../../../artifact-unsigned.zip" && popd
+      - run: mkdir -p ./signed
+      - id: upload-unsigned-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "GiantLogViewer-${{ github.ref_name }}-windows-${{ runner.arch }}-unsigned-boxed"
+          path: artifact-unsigned.zip
+      - name: Sign the executable with SignPath
+        uses: signpath/github-action-submit-signing-request@v1.1
+        with:
+          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id: '722c5ee4-3812-470e-81b7-f5af919ff54a'
+          project-slug: 'giant-log-viewer'
+          signing-policy-slug: 'test-signing'
+          github-artifact-id: '${{ steps.upload-unsigned-artifact.outputs.artifact-id }}'
+          wait-for-completion: true
+          output-artifact-directory: 'signed'
+          parameters: |
+            version: ${{ toJSON(github.ref_name) }}
+            commit: ${{ toJSON(github.sha) }}
+      - run: ls -lR ./signed && mv "./signed/artifact-unsigned.zip" "GiantLogViewer-${{ github.ref_name }}-windows-${{ runner.arch }}.zip"
+        shell: bash # let Windows use bash
       - uses: softprops/action-gh-release@v1
         with:
           files: "GiantLogViewer-${{ github.ref_name }}-windows-${{ runner.arch }}.zip"

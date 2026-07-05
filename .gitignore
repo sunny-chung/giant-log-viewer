@@ -1,5 +1,6 @@
 ### Custom ###
 /ignore
+/signing
 /doc/output
 local.properties
 /.gradle-codex
