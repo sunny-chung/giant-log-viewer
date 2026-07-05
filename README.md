@@ -20,6 +20,10 @@ This software loads instantly with same low memory footprint regardless of a 4 M
 1. Drag and drop a UTF-8 / ASCII text file to this application.
 2. Navigate with a keyboard. The `less` key bindings can be used. Click the "?" button in the top-right corner for the full keymap.
 
+## Sponsors
+
+For Windows builds: Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+
 ## Executables are not signed by verified developers
 
 Builds are built by GitHub runners which take the source code published here directly. You can always examine the source code or build yourself. Please also consider donation so that I could sign the executables one day.
@@ -43,3 +47,11 @@ Welcome! Note that this project is [slightly reluctant to use third-party librar
 > [macOS / Linux] `./gradlew clean createReleaseDistributable packageReleaseDistributionForCurrentOS`
 
 The build will be available under the directory `$projectDir/build/compose/binaries/main-release/`.
+
+## Team Members
+
+Committers, reviewers and approvers: Sunny Chung
+
+## Privacy Policy
+
+This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it.
