@@ -4,6 +4,8 @@ import com.sunnychung.application.multiplatform.giantlogviewer.io.codec.Utf16BET
 import com.sunnychung.application.multiplatform.giantlogviewer.io.codec.Utf16LETextFileCodec
 import com.sunnychung.application.multiplatform.giantlogviewer.io.codec.Utf8TextFileCodec
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.IOException
 import java.io.RandomAccessFile
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.locks.ReentrantReadWriteLock
@@ -23,14 +25,14 @@ class GiantFileReader(
     initialFileLength: Long = -1,
     val textEncoding: TextEncoding = TextEncoding.Auto,
 ) : AutoCloseable {
-    private val file = RandomAccessFile(filePath, "r")
+    private val file = File(filePath)
 
     init {
         require(blockSize >= MIN_BLOCK_SIZE) { "`blockSize` should be at least $MIN_BLOCK_SIZE bytes" }
     }
 
     var fileLength: Long = initialFileLength.takeIf { it > 0 } ?:
-        file.length()
+        currentFileLengthOrThrow()
 
     private val blockCacheLock = ReentrantReadWriteLock()
     private val blockCache: Array<FileBlock?> = arrayOfNulls(BLOCK_CACHE_SIZE)
@@ -46,12 +48,27 @@ class GiantFileReader(
         get() = resolvedTextEncoding.contentStartBytePosition
 
     override fun close() {
-        file.close()
+        // Reads use short-lived handles so Windows can move or delete the selected file.
     }
 
-    fun lengthInBytes(): Long = fileLength
+    fun lengthInBytes(): Long = currentFileLengthOrThrow()
+
+    private fun currentFileLengthOrThrow(expectedMinimumLength: Long? = null): Long {
+        if (!file.isFile) {
+            throw FileUnavailableException("The selected file was moved or deleted.")
+        }
+        if (!file.canRead()) {
+            throw FileUnavailableException("The selected file is no longer readable.")
+        }
+        val currentLength = file.length()
+        if (expectedMinimumLength != null && currentLength < expectedMinimumLength) {
+            throw FileUnavailableException("The selected file was shortened.")
+        }
+        return currentLength
+    }
 
     private fun readBlock(block: FileBlockPosition, fileSize: Long): Pair<ByteArray, LongRange> {
+        currentFileLengthOrThrow(expectedMinimumLength = fileSize)
         if (block.position < 0 || block.position > fileSize / blockSize) {
             throw IndexOutOfBoundsException("Attempt to read block ${block.position} from ${block.anchor} but there are only ${fileSize / blockSize} blocks. File size is ${fileSize}.")
         }
@@ -60,8 +77,23 @@ class GiantFileReader(
             val readLength = minOf(blockSize.toLong(), fileSize - readStart).toInt()
             val bytes = ByteArray(readLength)
             if (readLength > 0) {
-                file.seek(readStart)
-                file.read(bytes)
+                try {
+                    RandomAccessFile(file, "r").use { file ->
+                        file.seek(readStart)
+                        var offset = 0
+                        while (offset < readLength) {
+                            val bytesRead = file.read(bytes, offset, readLength - offset)
+                            if (bytesRead < 0) {
+                                throw FileUnavailableException("The selected file was shortened.")
+                            }
+                            offset += bytesRead
+                        }
+                    }
+                } catch (e: FileUnavailableException) {
+                    throw e
+                } catch (e: IOException) {
+                    throw FileUnavailableException("The selected file is no longer readable.", e)
+                }
             }
             return bytes to (readStart ..< readStart + readLength)
         } else {
@@ -151,6 +183,7 @@ class GiantFileReader(
         }
 
         val fileSize = fileLength
+        currentFileLengthOrThrow(expectedMinimumLength = fileSize)
         val start = startBytePosition.coerceIn(0L, fileSize)
         val endExclusive = (start + length.toLong()).coerceAtMost(fileSize)
         if (endExclusive <= start) {
@@ -186,6 +219,7 @@ class GiantFileReader(
         }
 
         val fileSize = fileLength
+        currentFileLengthOrThrow(expectedMinimumLength = fileSize)
         val start = startBytePosition.coerceIn(0L, fileSize)
         val endExclusive = (start + length.toLong()).coerceAtMost(fileSize)
         if (endExclusive <= start) {
@@ -205,7 +239,7 @@ class GiantFileReader(
         return if (offset == bytes.size) {
             bytes to (start ..< endExclusive)
         } else {
-            bytes.copyOf(offset) to (start ..< start + offset.toLong())
+            throw FileUnavailableException("The selected file was shortened.")
         }
     }
 
@@ -235,10 +269,16 @@ class GiantFileReader(
      * of the block cache. This is intended for large one-shot reads such as clipboard copy.
      */
     fun readTextUncached(startBytePosition: Long, length: Int): DecodedTextWindow {
-        RandomAccessFile(filePath, "r").use { directFile ->
-            return codec.readText(startBytePosition, length, fileLength) { start, readLength ->
-                readRawBytesDirect(directFile, start, readLength)
+        try {
+            RandomAccessFile(file, "r").use { directFile ->
+                return codec.readText(startBytePosition, length, fileLength) { start, readLength ->
+                    readRawBytesDirect(directFile, start, readLength)
+                }
             }
+        } catch (e: FileUnavailableException) {
+            throw e
+        } catch (e: IOException) {
+            throw FileUnavailableException("The selected file is no longer readable.", e)
         }
     }
 
