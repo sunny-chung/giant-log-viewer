@@ -201,6 +201,26 @@ class GiantFileTextPagerSearchForwardTest {
 
     @ParameterizedTest
     @EnumSource(TestFileEncoding::class)
+    fun searchDoesNotMatchInsideEmojiSequence(encoding: TestFileEncoding) {
+        val fileContent = "A👆🏿B"
+        createTestFile(fileContent, encoding) { file ->
+            val fileReader = GiantFileReader(file.absolutePath, 16)
+            val pager = CoroutineGiantFileTextPager(
+                fileReader,
+                MonospaceBidirectionalTextLayouter(DivisibleWidthCharMeasurer(16f)),
+            )
+            pager.viewport = Viewport(width = 16 * 7, height = 12 * 5, density = 1f)
+
+            assertEquals(GiantFileTextPager.NOT_FOUND, pager.searchAtAndForward(0L, Regex("👆")))
+            assertEquals(
+                encoding.byteRange(fileContent, 1..4),
+                pager.searchAtAndForward(0L, Regex("👆🏿")),
+            )
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(TestFileEncoding::class)
     fun unicodeAcrossMultipleBlocks(encoding: TestFileEncoding) {
         val random = Random(2347)
         val searchPattern = "喂你好😄😄!"

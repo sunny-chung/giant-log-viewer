@@ -33,6 +33,7 @@ fun DropDownView(
     entries: List<ContextMenuItemEntry>,
     textStyleModifier: (TextStyle) -> TextStyle = { it },
     testTag: String = "",
+    onItemActionComplete: () -> Unit = {},
 ) {
     val color = LocalColor.current
     var isDropdownVisible by remember { mutableStateOf(false) }
@@ -43,6 +44,7 @@ fun DropDownView(
             onDismiss = { isDropdownVisible = false },
             entries = entries,
             testTag = "",
+            onItemActionComplete = onItemActionComplete,
         )
 
         Row(

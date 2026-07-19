@@ -2,13 +2,13 @@
 
 Needing to check a 4.9 GB log file on a platform where the `less` file pager is not available? Don't cry. This software is going to save you!
 
-This software loads instantly with same low memory footprint regardless of a 4 MB, 4 GB or 4 TB text file is opened, as long as it doesn't hit any [limitation](#limitations). The JVM is limited to use at most 80 MB heap memory (plus overheads) currently.
+This software loads instantly with same low memory footprint regardless of a 4 MB, 4 GB, 4 TB or 4 PB text file is opened, as long as it doesn't hit any [limitation](#limitations). The JVM is limited to use at most 80 MB heap memory (plus overheads) currently.
 
 ![Screenshot](doc/media/screenshot-viewer.png)
 ![Screenshot](doc/media/screenshot-viewer-dark.png)
 
 ## Limitations
-- Supports UTF-8 encoding and ASCII text files only
+- Supports UTF-8, UTF-8 with BOM (since v2.0.0), UTF-16 (since v2.0.0) and ASCII text files only
 - Doesn't work if there is a long line (>= 1 MB) in the file
 - Emoji sequences are not supported -- it would be displayed as multiple emoji characters
 - Doesn't work if your OS has no GUI
@@ -22,7 +22,7 @@ This software loads instantly with same low memory footprint regardless of a 4 M
 
 ## Sponsors
 
-For Windows builds: Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+For Windows builds (since v2.0.0-pre.2): Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
 
 ## Executables are not signed by verified developers
 

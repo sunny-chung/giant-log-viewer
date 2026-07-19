@@ -27,9 +27,11 @@ kotlin {
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation(compose.components.resources)
-                implementation("io.github.sunny-chung:bigtext-ui-composable:2.2.0")
+                implementation("io.github.sunny-chung:bigtext-ui-composable:2.5.0")
                 implementation("io.github.sunny-chung:kdatetime-multiplatform:1.1.0")
                 implementation("io.github.sunny-chung:composable-table:1.3.1")
+                implementation("io.github.vinceglb:filekit-core:0.10.0-beta04")
+                implementation("io.github.vinceglb:filekit-dialogs:0.10.0-beta04")
 
                 // no longer in use
                 // implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.1")

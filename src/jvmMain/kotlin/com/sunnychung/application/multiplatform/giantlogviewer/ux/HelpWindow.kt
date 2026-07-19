@@ -55,8 +55,8 @@ fun HelpWindow(isVisible: Boolean, onClose: () -> Unit) {
         icon = painterResource(Res.drawable.appicon),
         state = WindowState(
             position = WindowPosition.Aligned(Alignment.Center),
-            width = 600.dp,
-            height = 400.dp,
+            width = 720.dp,
+            height = 560.dp,
         ),
         onKeyEvent = { e ->
             if (e.type == KeyEventType.KeyDown && e.key == Key.Escape) {
@@ -83,35 +83,48 @@ fun HelpWindow(isVisible: Boolean, onClose: () -> Unit) {
                 keyBindings = listOf(
                     KeyBinding("↓", "Next row"),
                     KeyBinding("↑", "Previous row"),
+                    KeyBinding("→", "Scroll right one window"),
+                    KeyBinding("←", "Scroll left one window"),
+                    KeyBinding("⇧→", "Scroll right one character"),
+                    KeyBinding("⇧←", "Scroll left one character"),
                     KeyBinding("f", "One window forward"),
                     KeyBinding("b", "One window backward"),
                     KeyBinding("⇧G", "End of file"),
                     KeyBinding("g", "Start of file"),
                     KeyBinding("⇧/", "Search backward"),
                     KeyBinding("/", "Search forward"),
+//                    KeyBinding("Alt/Option-click/drag", "Column selection"),
+//                    KeyBinding("Alt/Option-Shift-click/drag", "Extend column selection"),
                     KeyBinding("⇧F", "Follow new appends"),
-                    KeyBinding("Ctrl-C", "Exit follow"),
+                    KeyBinding("Ctrl-C", "Cancel follow/copy"),
                     KeyBinding("Esc", "Exit search"),
+                    KeyBinding("q", "Close file / Exit app"),
                 ),
-                modifier = Modifier.weight(.42f).fillMaxHeight()
+                modifier = Modifier.weight(.43f).fillMaxHeight()
             )
             KeyBindingTable(
                 title = AnnotatedString("The memory-less style"),
                 keyBindings = listOf(
                     KeyBinding("↓", "Next row"),
                     KeyBinding("↑", "Previous row"),
+                    KeyBinding("→", "Scroll right one window"),
+                    KeyBinding("←", "Scroll left one window"),
+//                    KeyBinding("Shift-→", "Scroll right one character"),
+//                    KeyBinding("Shift-←", "Scroll left one character"),
                     KeyBinding("Alt/Option-↓", "One window forward"),
                     KeyBinding("Alt/Option-↑", "One window backward"),
                     KeyBinding("Ctrl/Command-↓", "End of file"),
                     KeyBinding("Ctrl/Command-↑", "Start of file"),
                     KeyBinding("Ctrl/Command-F", "Search forward"),
                     KeyBinding("Shift-F", "Follow new appends"),
-                    KeyBinding("Esc", "Exit follow/search"),
+                    KeyBinding("Esc", "Cancel follow/search/copy"),
                     KeyBinding("Enter", "Search next"),
                     KeyBinding("Shift-Enter", "Search previous"),
                     KeyBinding("Ctrl/Command-C", "Copy selection"),
+                    KeyBinding("Alt/Option-🤚", "Column selection"),
+                    KeyBinding("Alt/Option-Shift-👆/🤚", "Extend column selection"),
                 ),
-                modifier = Modifier.weight(.58f).fillMaxHeight()
+                modifier = Modifier.weight(.57f).fillMaxHeight()
             )
         }
     }

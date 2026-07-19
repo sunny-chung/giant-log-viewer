@@ -41,6 +41,7 @@ fun AppTextField(
     transformation: IncrementalTextTransformation<*>? = null,
     decorator: BigTextDecorator? = null,
     singleLine: Boolean = false,
+    maxInputLength: Long = Long.MAX_VALUE,
 //    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     colors: TextFieldColors = TextFieldDefaults.textFieldColors(
         textColor = LocalColor.current.textFieldContent,
@@ -50,7 +51,7 @@ fun AppTextField(
     ),
     contentPadding: PaddingValues = PaddingValues(6.dp),
 //    hasIndicatorLine: Boolean = false,
-    onPointerEvent: ((event: PointerEvent, tag: String?) -> Unit)? = null,
+    onPointerEvent: ((event: PointerEvent, charIndex: Int, tag: String?) -> Unit)? = null,
     isAsynchronous: Boolean = false,
 
     /**
@@ -87,6 +88,7 @@ fun AppTextField(
                 textTransformation = transformation,
                 textDecorator = decorator,
                 isSingleLineInput = singleLine,
+                maxInputLength = maxInputLength,
                 contextMenu = AppBigTextFieldContextMenu,
                 onPointerEvent = onPointerEvent,
 //                interactionSource = interactionSource,
@@ -124,6 +126,7 @@ fun AppTextField(
     decorator: BigTextDecorator? = null,
     singleLine: Boolean = false,
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
+    maxInputLength: Long = Long.MAX_VALUE,
     colors: TextFieldColors = TextFieldDefaults.textFieldColors(
         textColor = LocalColor.current.textFieldContent,
         placeholderColor = LocalColor.current.textFieldPlaceholder,
@@ -132,7 +135,7 @@ fun AppTextField(
     ),
     contentPadding: PaddingValues = PaddingValues(6.dp),
 //    hasIndicatorLine: Boolean = false,
-    onPointerEvent: ((event: PointerEvent, tag: String?) -> Unit)? = null,
+    onPointerEvent: ((event: PointerEvent, charIndex: Int, tag: String?) -> Unit)? = null,
     onFinishInit: () -> Unit = {},
 ) {
     val textState by rememberConcurrentLargeAnnotatedBigTextFieldState(value, key)
@@ -152,6 +155,7 @@ fun AppTextField(
         transformation = transformation,
         decorator = decorator,
         singleLine = singleLine,
+        maxInputLength = maxInputLength,
         colors = colors,
         contentPadding = contentPadding,
         onPointerEvent = onPointerEvent,

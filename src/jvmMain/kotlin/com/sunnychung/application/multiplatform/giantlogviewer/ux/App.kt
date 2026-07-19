@@ -2,6 +2,7 @@ package com.sunnychung.application.multiplatform.giantlogviewer.ux
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.DragData
@@ -28,7 +30,10 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.onExternalDrag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -40,6 +45,7 @@ import com.sunnychung.application.giantlogviewer.generated.resources.fast_forwar
 import com.sunnychung.application.giantlogviewer.generated.resources.help
 import com.sunnychung.application.giantlogviewer.generated.resources.info
 import com.sunnychung.application.giantlogviewer.generated.resources.setting
+import com.sunnychung.application.giantlogviewer.generated.resources.wrap_text
 import com.sunnychung.application.multiplatform.giantlogviewer.document.ThemeDI
 import com.sunnychung.application.multiplatform.giantlogviewer.document.toColorTheme
 import com.sunnychung.application.multiplatform.giantlogviewer.extension.subscribeStateToEntity
@@ -51,16 +57,22 @@ import com.sunnychung.application.multiplatform.giantlogviewer.model.SearchResul
 import com.sunnychung.application.multiplatform.giantlogviewer.ux.local.LocalColor
 import com.sunnychung.application.multiplatform.giantlogviewer.ux.local.LocalFont
 import com.sunnychung.application.multiplatform.giantlogviewer.viewstate.FileViewState
+import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.dialogs.openFilePicker
+import io.github.vinceglb.filekit.path
+import kotlinx.coroutines.launch
 import java.io.File
 import java.net.URI
 import java.util.regex.Pattern
 
 @Composable
-fun App() {
+@OptIn(ExperimentalComposeUiApi::class)
+fun App(onExitApplication: () -> Unit = {}) {
     var selectedFileName by remember { mutableStateOf("") }
     var isShowHelpWindow by remember { mutableStateOf(false) }
     var isShowAboutWindow by remember { mutableStateOf(false) }
     var isShowSettingWindow by remember { mutableStateOf(false) }
+    var isSoftWrapEnabled by remember { mutableStateOf(true) }
 
     val themePreference = AppContext.instance.ThemePreferenceRepository
         .subscribeStateToEntity(ThemeDI)
@@ -68,6 +80,11 @@ fun App() {
 
     var selectedFilePath by remember { mutableStateOf("") }
     var fileViewState: FileViewState by remember(selectedFilePath) { mutableStateOf(FileViewState(File(selectedFilePath))) }
+    var dismissSelectionMenuKey by remember { mutableIntStateOf(0) }
+    val isReadableFileSelected = selectedFilePath
+        .takeIf { it.isNotEmpty() }
+        ?.let { File(it).let { file -> file.isFile && file.canRead() } }
+        ?: false
 
     print("App recompose - $themePreference")
 
@@ -79,7 +96,10 @@ fun App() {
         Column(Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier.fillMaxWidth().height(30.dp)
-                    .background(colors.menuBarBackground),
+                    .background(colors.menuBarBackground)
+                    .onPointerEvent(eventType = PointerEventType.Press) {
+                        dismissSelectionMenuKey++
+                    },
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AppImage(
@@ -116,6 +136,17 @@ fun App() {
                     )
                 }
                 AppImage(
+                    resource = Res.drawable.wrap_text,
+                    size = 20.dp,
+                    color = if (isSoftWrapEnabled) colors.menuBarIconActivated else colors.menuBarIconColor,
+                    enabled = isReadableFileSelected,
+                    modifier = Modifier.padding(5.dp)
+                        .clickable(enabled = isReadableFileSelected) {
+                            isSoftWrapEnabled = !isSoftWrapEnabled
+                            viewerFocusRequester.requestFocus()
+                        }
+                )
+                AppImage(
                     resource = Res.drawable.help,
                     size = 20.dp,
                     color = colors.menuBarIconColor,
@@ -136,10 +167,14 @@ fun App() {
             }
 
             AppMainContent(
+                selectedFilePath = selectedFilePath,
                 fileViewState = fileViewState,
-                onSelectFile = {
-                    selectedFileName = it?.name ?: ""
-                    selectedFilePath = it?.path ?: ""
+                isSoftWrapEnabled = isSoftWrapEnabled,
+                dismissSelectionMenuKey = dismissSelectionMenuKey,
+                onExitApplication = onExitApplication,
+                onSelectFile = { file ->
+                    selectedFileName = file?.name ?: ""
+                    selectedFilePath = file?.path ?: ""
                 },
                 modifier = Modifier.focusRequester(viewerFocusRequester)
             )
@@ -153,14 +188,23 @@ fun App() {
 
 @Composable
 @OptIn(ExperimentalComposeUiApi::class)
-private fun AppMainContent(modifier: Modifier = Modifier, fileViewState: FileViewState, onSelectFile: (File?) -> Unit) {
+private fun AppMainContent(
+    modifier: Modifier = Modifier,
+    selectedFilePath: String,
+    fileViewState: FileViewState,
+    isSoftWrapEnabled: Boolean,
+    dismissSelectionMenuKey: Int,
+    onExitApplication: () -> Unit,
+    onSelectFile: (File?) -> Unit,
+) {
     val colors = LocalColor.current
 
     val isNavigationLocked = fileViewState.isFollowing
 
-    var selectedFilePath by remember { mutableStateOf("") }
-
     val viewerFocusRequester = remember { FocusRequester() }
+    val emptyFileFocusRequester = remember { FocusRequester() }
+    val openFileCoroutineScope = rememberCoroutineScope()
+    var shouldFocusViewerAfterSelect by remember { mutableStateOf(false) }
     var filePager: GiantFileTextPager? by remember { mutableStateOf(null) }
 
     var isSearchBarVisible by remember { mutableStateOf(false) }
@@ -179,15 +223,25 @@ private fun AppMainContent(modifier: Modifier = Modifier, fileViewState: FileVie
     var searchOptionsOfResult by remember { mutableStateOf<SearchOptions?>(null) }
     var searchEntryOfResult by remember { mutableStateOf("") }
     var searchBarReloadKey by remember { mutableIntStateOf(0) }
+    var isSearchFieldFocused by remember { mutableStateOf(false) }
+    var isSearchError by remember { mutableStateOf(false) }
 
     fun resetSearchResultState(recreateSearchField: Boolean = false) {
         searchCursor = filePager?.viewportStartBytePosition ?: 0L
         highlightByteRange = 0L .. -1L
         searchOptionsOfResult = null
         searchEntryOfResult = ""
+        isSearchError = false
         if (recreateSearchField) {
             searchBarReloadKey++
         }
+    }
+
+    fun setSearchError() {
+        highlightByteRange = 0L .. -1L
+        searchOptionsOfResult = searchOptions
+        searchEntryOfResult = searchEntry
+        isSearchError = true
     }
 
     fun isSearchResultStateCurrent(): Boolean {
@@ -208,12 +262,21 @@ private fun AppMainContent(modifier: Modifier = Modifier, fileViewState: FileVie
                 Pattern.quote(searchEntry).toRegex(regexOption)
             }
             return pattern
-        } catch (_: Throwable) {}
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            setSearchError()
+        }
         return null
     }
 
     LaunchedEffect(selectedFilePath) {
         resetSearchResultState()
+    }
+
+    LaunchedEffect(isSearchBarVisible) {
+        if (!isSearchBarVisible) {
+            isSearchFieldFocused = false
+        }
     }
 
     Column(modifier.fillMaxSize()) {
@@ -232,16 +295,41 @@ private fun AppMainContent(modifier: Modifier = Modifier, fileViewState: FileVie
                             val uri = URI((drop.dragData as DragData.FilesList).readFiles().first())
 
                             println("f: ${uri.scheme} ${File(uri).absolutePath}")
-                            selectedFilePath = File(uri).absolutePath
-
-                            viewerFocusRequester.requestFocus()
+                            onSelectFile(File(uri))
+                            shouldFocusViewerAfterSelect = true
                         }
                     }
                 )
                 .background(colors.fileBodyTheme.background)
         ) {
             if (selectedFilePath.isEmpty()) {
-                EmptyFileView()
+                LaunchedEffect(Unit) {
+                    emptyFileFocusRequester.requestFocus()
+                }
+
+                EmptyFileView(
+                    modifier = Modifier
+                        .onPreviewKeyEvent { e ->
+                            if (
+                                e.type == KeyEventType.KeyDown &&
+                                e.key == Key.Q
+                            ) {
+                                onExitApplication()
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        .focusRequester(emptyFileFocusRequester)
+                        .focusable(),
+                    onOpenFileClick = {
+                        openFileCoroutineScope.launch {
+                            val file = FileKit.openFilePicker(title = "Open text file") ?: return@launch
+                            onSelectFile(File(file.path))
+                            shouldFocusViewerAfterSelect = true
+                        }
+                    }
+                )
                 onSelectFile(null)
                 return@Box
             }
@@ -265,14 +353,27 @@ private fun AppMainContent(modifier: Modifier = Modifier, fileViewState: FileVie
 
             onSelectFile(file)
 
+            LaunchedEffect(selectedFilePath, shouldFocusViewerAfterSelect) {
+                if (shouldFocusViewerAfterSelect) {
+                    viewerFocusRequester.requestFocus()
+                    shouldFocusViewerAfterSelect = false
+                }
+            }
+
             GiantTextViewer(
                 fileViewState = fileViewState,
+                isSoftWrapEnabled = isSoftWrapEnabled,
                 filePath = selectedFilePath,
                 highlightByteRange = highlightByteRange,
                 onPagerReady = { filePager = it },
                 onNavigate = { searchCursor = it },
                 onDocumentContentChanged = {
                     resetSearchResultState(recreateSearchField = true)
+                },
+                onCloseFile = {
+                    isSearchBarVisible = false
+                    filePager = null
+                    onSelectFile(null)
                 },
                 onSearchRequest = {
                     if (it == SearchMode.None) {
@@ -282,6 +383,7 @@ private fun AppMainContent(modifier: Modifier = Modifier, fileViewState: FileVie
                         isSearchBackwardDefault = (it == SearchMode.Backward)
                     }
                 },
+                dismissSelectionMenuKey = dismissSelectionMenuKey,
                 bottomContent = {
                     if (isSearchBarVisible) {
                         TextSearchBar(
@@ -295,6 +397,8 @@ private fun AppMainContent(modifier: Modifier = Modifier, fileViewState: FileVie
                             isSearchBackwardDefault = isSearchBackwardDefault,
                             searchResultType = if (!isSearchResultStateCurrent()) {
                                 SearchResultType.NotYetSearch
+                            } else if (isSearchError) {
+                                SearchResultType.Error
                             } else if (highlightByteRange.isEmpty()) {
                                 SearchResultType.NoResult
                             } else {
@@ -324,8 +428,10 @@ private fun AppMainContent(modifier: Modifier = Modifier, fileViewState: FileVie
                                     pager.searchBackward(searchCursor, regex)
                                 } catch (e: Throwable) {
                                     e.printStackTrace()
+                                    setSearchError()
                                     return@TextSearchBar
                                 }
+                                isSearchError = false
                                 if (!result.isEmpty()) {
                                     searchCursor = result.start
                                     println("search found at $result")
@@ -353,8 +459,10 @@ private fun AppMainContent(modifier: Modifier = Modifier, fileViewState: FileVie
                                         pager.searchAtAndForward(searchStartBytePosition, regex)
                                     } catch (e: Throwable) {
                                         e.printStackTrace()
+                                        setSearchError()
                                         return@TextSearchBar
                                     }
+                                    isSearchError = false
                                     if (!result.isEmpty()) {
                                         searchCursor = result.start
                                         println("search found at $result")
@@ -367,6 +475,9 @@ private fun AppMainContent(modifier: Modifier = Modifier, fileViewState: FileVie
                                     searchOptionsOfResult = searchOptions
                                     searchEntryOfResult = searchEntry
                                 }
+                            },
+                            onSearchFieldFocusChanged = {
+                                isSearchFieldFocused = it
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -386,6 +497,7 @@ private fun AppMainContent(modifier: Modifier = Modifier, fileViewState: FileVie
                     }
                 },
                 shouldRequestFocus = !isSearchBarVisible,
+                isKeyboardShortcutEnabled = !isSearchFieldFocused,
                 modifier = Modifier.matchParentSize()
                     .focusRequester(viewerFocusRequester)
             )

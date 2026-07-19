@@ -11,16 +11,25 @@ _Changes since 1.2.0_
 ### Added
 - Follow new appends to the end of the opened file (Shift-F)
 - Support UTF-8 with BOM and UTF-16 encodings in additional to current encoding support of UTF-8 without BOM
+- Long lines (>= 1 MB per line) are now supported
 - Status bar, which shows current byte range, last modified date time and current encoding
+- Shift-Click to extend selection
+- Dragging out of view to scroll and extend selection
+- Copy selection(s) to a file
+- Option to turn off soft wrapping
+- Column / Vertical selection
 
 ### Changed
 - New appends to the opened file are not automatically followed anymore
 - After going pass the last search result, searching reversely would first visit the last search result
+- Copy text length limit is increased from 1 MB to 5 MB
+- Improved error display for regular expression searching
 
 ### Fixed
 - Mouse scrolling did not reposition the search cursor correctly
 - Search cursor was incorrect after going pass the last search result
 - Search result states did not reset after loading a new file
+- Possible overflow when a file with over 1 TB size is navigated
 
 
 ## [1.2.0] -- 2025-05-12

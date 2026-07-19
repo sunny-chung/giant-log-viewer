@@ -10,6 +10,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.material.CursorDropdownMenu
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
@@ -24,6 +25,7 @@ fun ContextMenuView(
     onDismiss: () -> Unit,
     entries: List<ContextMenuItemEntry>,
     testTag: String,
+    onItemActionComplete: () -> Unit = {},
 ) {
     val colors = LocalColor.current
     CursorDropdownMenu(
@@ -41,10 +43,15 @@ fun ContextMenuView(
                             fontFamily = LocalFont.current.normalFontFamily,
                         ),
                         modifier = Modifier
+                            .focusProperties { canFocus = false }
                             .clickable {
                                 if (it.isEnabled) {
                                     onDismiss()
-                                    it.action()
+                                    try {
+                                        it.action()
+                                    } finally {
+                                        onItemActionComplete()
+                                    }
                                 }
                             }
                             .padding(horizontal = 12.dp, vertical = 6.dp)

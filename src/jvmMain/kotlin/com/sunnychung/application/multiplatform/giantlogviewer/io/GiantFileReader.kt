@@ -1,5 +1,8 @@
 package com.sunnychung.application.multiplatform.giantlogviewer.io
 
+import com.sunnychung.application.multiplatform.giantlogviewer.io.codec.Utf16BETextFileCodec
+import com.sunnychung.application.multiplatform.giantlogviewer.io.codec.Utf16LETextFileCodec
+import com.sunnychung.application.multiplatform.giantlogviewer.io.codec.Utf8TextFileCodec
 import java.io.ByteArrayOutputStream
 import java.io.RandomAccessFile
 import java.nio.charset.StandardCharsets
@@ -173,6 +176,39 @@ class GiantFileReader(
         return out.toByteArray() to (start ..< current)
     }
 
+    private fun readRawBytesDirect(
+        file: RandomAccessFile,
+        startBytePosition: Long,
+        length: Int,
+    ): Pair<ByteArray, LongRange> {
+        if (length <= 0) {
+            return ByteArray(0) to (startBytePosition ..< startBytePosition)
+        }
+
+        val fileSize = fileLength
+        val start = startBytePosition.coerceIn(0L, fileSize)
+        val endExclusive = (start + length.toLong()).coerceAtMost(fileSize)
+        if (endExclusive <= start) {
+            return ByteArray(0) to (start ..< start)
+        }
+
+        val bytes = ByteArray((endExclusive - start).toInt())
+        file.seek(start)
+        var offset = 0
+        while (offset < bytes.size) {
+            val bytesRead = file.read(bytes, offset, bytes.size - offset)
+            if (bytesRead < 0) {
+                break
+            }
+            offset += bytesRead
+        }
+        return if (offset == bytes.size) {
+            bytes to (start ..< endExclusive)
+        } else {
+            bytes.copyOf(offset) to (start ..< start + offset.toLong())
+        }
+    }
+
     internal fun readAsByteArrayOutputStream(startBytePosition: Long, length: Int): Pair<ByteArrayOutputStream2, LongRange> {
         val window = readText(startBytePosition, length)
         val bytes = window.text.toByteArray(resolvedTextEncoding.charset)
@@ -182,14 +218,28 @@ class GiantFileReader(
     }
 
     /**
-     * It is not guaranteed that exactly `length` bytes would be read.
+     * Reads at least `length` bytes when possible, then expands the decoded range as needed so the
+     * returned text does not start or end inside a multi-byte character. File bounds may make the
+     * returned range shorter than `length`.
      *
      * @param startBytePosition 0-based, in bytes
-     * @param length in bytes
-     * @return pair of decoded string and the range of absolute byte positions of the decoded string
+     * @param length minimum bytes to include before character-boundary adjustment
+     * @return decoded text and the absolute byte range that produced it
      */
     fun readText(startBytePosition: Long, length: Int): DecodedTextWindow {
         return codec.readText(startBytePosition, length, fileLength, ::readRawBytes)
+    }
+
+    /**
+     * Same decoding contract as `readText`, but reads bytes through a separate file handle instead
+     * of the block cache. This is intended for large one-shot reads such as clipboard copy.
+     */
+    fun readTextUncached(startBytePosition: Long, length: Int): DecodedTextWindow {
+        RandomAccessFile(filePath, "r").use { directFile ->
+            return codec.readText(startBytePosition, length, fileLength) { start, readLength ->
+                readRawBytesDirect(directFile, start, readLength)
+            }
+        }
     }
 
     fun readString(startBytePosition: Long, length: Int): Pair<String, LongRange> {
@@ -203,6 +253,30 @@ class GiantFileReader(
     }
 
     fun encodedLength(text: CharSequence): Long = codec.encodedLength(text)
+
+    fun rawLineScanReadLength(requestedLength: Int): Int = codec.rawLineScanReadLength(requestedLength)
+
+    fun findFirstLineFeedBytePosition(bytes: ByteArray, rangeStart: Long): Long? {
+        return codec.findFirstLineFeedBytePosition(bytes, rangeStart)
+    }
+
+    fun findLineFeedBytePositions(bytes: ByteArray, rangeStart: Long): List<Long> {
+        return codec.findLineFeedBytePositions(bytes, rangeStart)
+    }
+
+    fun findLastLineFeedBytePosition(
+        bytes: ByteArray,
+        rangeStart: Long,
+        strictBeforeBytePosition: Long,
+    ): Long? {
+        return codec.findLastLineFeedBytePosition(bytes, rangeStart, strictBeforeBytePosition)
+    }
+
+    val lineFeedByteLength: Long
+        get() = codec.lineFeedByteLength
+
+    val minBytesPerCharacter: Long
+        get() = codec.minBytesPerCharacter
 
     private fun resolveTextEncoding(): ResolvedTextEncoding {
         val header = readRawBytes(0L, TEXT_ENCODING_PROBE_BYTES).first
@@ -226,8 +300,8 @@ class GiantFileReader(
     private fun createCodec(encoding: ResolvedTextEncoding): TextFileCodec {
         return when (encoding.kind) {
             TextEncodingKind.Utf8 -> Utf8TextFileCodec(encoding)
-            TextEncodingKind.Utf16LE,
-            TextEncodingKind.Utf16BE -> Utf16TextFileCodec(encoding)
+            TextEncodingKind.Utf16LE -> Utf16LETextFileCodec(encoding)
+            TextEncodingKind.Utf16BE -> Utf16BETextFileCodec(encoding)
         }
     }
 

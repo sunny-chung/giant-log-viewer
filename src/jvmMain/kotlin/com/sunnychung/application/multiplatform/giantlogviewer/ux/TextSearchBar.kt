@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
@@ -41,6 +42,7 @@ fun TextSearchBar(
     onToggleWholeWord: (Boolean) -> Unit,
     onClickPrev: () -> Unit,
     onClickNext: () -> Unit,
+    onSearchFieldFocusChanged: (Boolean) -> Unit = {},
 ) {
     val colors = LocalColor.current
 
@@ -80,6 +82,7 @@ fun TextSearchBar(
             textStyle = TextStyle(
                 fontFamily = LocalFont.current.monospaceFontFamily,
             ),
+            maxInputLength = 512 * 1024, // 512 KB
             maxLines = 1,
             singleLine = true, // not allow '\n'
             contentPadding = PaddingValues(4.dp),
@@ -90,8 +93,10 @@ fun TextSearchBar(
                 SearchResultType.NotYetSearch -> colors.textFieldBackground
                 SearchResultType.NoResult -> colors.searchTextFieldBackgroundNoResult
                 SearchResultType.SomeResult -> colors.searchTextFieldBackgroundSomeResult
+                SearchResultType.Error -> colors.searchTextFieldBackgroundError
             },
             modifier = Modifier.weight(1f)
+                .onFocusChanged { onSearchFieldFocusChanged(it.hasFocus) }
                 .focusRequester(focusRequester)
         )
         TextToggleButton(

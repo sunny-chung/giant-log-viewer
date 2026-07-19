@@ -119,6 +119,19 @@ class GiantFileReaderTest {
     }
 
     @Test
+    fun readTextUncachedExpandsIncompleteUtf8Character() {
+        val content = "A😄B"
+        val bytes = content.toByteArray(StandardCharsets.UTF_8)
+        createTestFile(bytes) { file ->
+            GiantFileReader(file.absolutePath, 8, textEncoding = TextEncoding.Utf8WithoutBom).use { reader ->
+                val window = reader.readTextUncached(2L, 1)
+                assertEquals("😄", window.text)
+                assertEquals(1L..<5L, window.byteRange)
+            }
+        }
+    }
+
+    @Test
     fun readUtf8FileWithBom() {
         val content = "A😄B\n下一行"
         val bytes = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) +
