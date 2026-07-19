@@ -200,6 +200,7 @@ private fun AppMainContent(
     val viewerFocusRequester = remember { FocusRequester() }
     val openFileCoroutineScope = rememberCoroutineScope()
     var shouldFocusViewerAfterSelect by remember { mutableStateOf(false) }
+    var fileErrorMessage by remember { mutableStateOf<String?>(null) }
     var filePager: GiantFileTextPager? by remember { mutableStateOf(null) }
 
     var isSearchBarVisible by remember { mutableStateOf(false) }
@@ -290,6 +291,7 @@ private fun AppMainContent(
                             val uri = URI((drop.dragData as DragData.FilesList).readFiles().first())
 
                             println("f: ${uri.scheme} ${File(uri).absolutePath}")
+                            fileErrorMessage = null
                             onSelectFile(File(uri))
                             shouldFocusViewerAfterSelect = true
                         }
@@ -299,9 +301,11 @@ private fun AppMainContent(
         ) {
             if (selectedFilePath.isEmpty()) {
                 EmptyFileView(
+                    errorMessage = fileErrorMessage,
                     onOpenFileClick = {
                         openFileCoroutineScope.launch {
                             val file = FileKit.openFilePicker(title = "Open text file") ?: return@launch
+                            fileErrorMessage = null
                             onSelectFile(File(file.path))
                             shouldFocusViewerAfterSelect = true
                         }
@@ -313,16 +317,19 @@ private fun AppMainContent(
 
             val file = File(selectedFilePath)
             if (!file.exists()) {
+                fileErrorMessage = "The selected object no longer exists."
                 ErrorView(message = "The selected object no longer exists")
                 onSelectFile(null)
                 return@Box
             }
             if (!file.isFile) {
+                fileErrorMessage = "The selected object is not a file."
                 ErrorView(message = "The selected object is not a file")
                 onSelectFile(null)
                 return@Box
             }
             if (!file.canRead()) {
+                fileErrorMessage = "The selected file is not readable."
                 ErrorView(message = "The selected file is not readable")
                 onSelectFile(null)
                 return@Box
@@ -346,6 +353,11 @@ private fun AppMainContent(
                 onNavigate = { searchCursor = it },
                 onDocumentContentChanged = {
                     resetSearchResultState(recreateSearchField = true)
+                },
+                onFileUnavailable = { message ->
+                    fileErrorMessage = message
+                    filePager = null
+                    onSelectFile(null)
                 },
                 onSearchRequest = {
                     if (it == SearchMode.None) {

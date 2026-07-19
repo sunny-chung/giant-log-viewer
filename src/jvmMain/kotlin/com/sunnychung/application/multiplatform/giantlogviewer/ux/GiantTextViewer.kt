@@ -84,6 +84,7 @@ import com.sunnychung.application.multiplatform.giantlogviewer.io.BYTES_PER_MIB
 import com.sunnychung.application.multiplatform.giantlogviewer.io.ComposeGiantFileTextPager
 import com.sunnychung.application.multiplatform.giantlogviewer.io.copyFileByteRange
 import com.sunnychung.application.multiplatform.giantlogviewer.io.GiantFileReader
+import com.sunnychung.application.multiplatform.giantlogviewer.io.FileUnavailableException
 import com.sunnychung.application.multiplatform.giantlogviewer.io.GiantFileTextPager
 import com.sunnychung.application.multiplatform.giantlogviewer.io.ResolvedTextEncoding
 import com.sunnychung.application.multiplatform.giantlogviewer.io.TextEncoding
@@ -145,6 +146,45 @@ fun GiantTextViewer(
     onPagerReady: (GiantFileTextPager?) -> Unit,
     onNavigate: (bytePosition: Long) -> Unit,
     onDocumentContentChanged: () -> Unit,
+    onFileUnavailable: (String) -> Unit = {},
+    onSearchRequest: (SearchMode) -> Unit,
+    dismissSelectionMenuKey: Int = 0,
+    bottomContent: @Composable () -> Unit = {},
+    shouldRequestFocus: Boolean = true,
+    isKeyboardShortcutEnabled: Boolean = true,
+) {
+    GiantTextViewerContent(
+        modifier = modifier,
+        fileViewState = fileViewState,
+        isSoftWrapEnabled = isSoftWrapEnabled,
+        filePath = filePath,
+        refreshKey = refreshKey,
+        highlightByteRange = highlightByteRange,
+        onPagerReady = onPagerReady,
+        onNavigate = onNavigate,
+        onDocumentContentChanged = onDocumentContentChanged,
+        onFileUnavailable = onFileUnavailable,
+        onSearchRequest = onSearchRequest,
+        dismissSelectionMenuKey = dismissSelectionMenuKey,
+        bottomContent = bottomContent,
+        shouldRequestFocus = shouldRequestFocus,
+        isKeyboardShortcutEnabled = isKeyboardShortcutEnabled,
+    )
+}
+
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class, TemporaryBigTextApi::class)
+@Composable
+private fun GiantTextViewerContent(
+    modifier: Modifier,
+    fileViewState: FileViewState,
+    isSoftWrapEnabled: Boolean,
+    filePath: String,
+    refreshKey: Int = 0,
+    highlightByteRange: LongRange,
+    onPagerReady: (GiantFileTextPager?) -> Unit,
+    onNavigate: (bytePosition: Long) -> Unit,
+    onDocumentContentChanged: () -> Unit,
+    onFileUnavailable: (String) -> Unit = {},
     onSearchRequest: (SearchMode) -> Unit,
     dismissSelectionMenuKey: Int = 0,
     bottomContent: @Composable () -> Unit = {},
@@ -152,8 +192,16 @@ fun GiantTextViewer(
     isKeyboardShortcutEnabled: Boolean = true,
 ) {
     val file = File(filePath)
-    if (!file.isFile) {
-        println("File is not a file")
+    val unavailableMessage = when {
+        !file.isFile -> "The selected file was moved or deleted."
+        !file.canRead() -> "The selected file is no longer readable."
+        else -> null
+    }
+    if (unavailableMessage != null) {
+        LaunchedEffect(filePath, unavailableMessage) {
+            onPagerReady(null)
+            onFileUnavailable(unavailableMessage)
+        }
         return
     }
 
@@ -1210,24 +1258,52 @@ fun GiantTextViewer(
         }
     }
 
+    LaunchedEffect(filePath, fileViewState.fileLength) {
+        while (true) {
+            delay(1.seconds().millis)
+            val errorMessage = when {
+                !fileViewState.file.isFile -> "The selected file was moved or deleted."
+                !fileViewState.file.canRead() -> "The selected file is no longer readable."
+                fileViewState.file.length() < fileViewState.fileLength -> "The selected file was shortened."
+                else -> null
+            }
+            if (errorMessage != null) {
+                onPagerReady(null)
+                onFileUnavailable(errorMessage)
+                break
+            }
+        }
+    }
+
     LaunchedEffect(filePath, fileViewState.isFollowing) {
         if (fileViewState.isFollowing) {
             launch {
-                while (fileViewState.isFollowing) {
-                    val currentFileLength = fileViewState.file.length()
-                    val currentLastModifiedMillis = fileViewState.file.lastModified()
-                    val isFileContentChanged = currentFileLength != fileViewState.fileLength ||
-                        currentLastModifiedMillis != lastModifiedMillis
+                try {
+                    while (fileViewState.isFollowing) {
+                        val currentFileLength = fileViewState.file.length()
+                        when {
+                            !fileViewState.file.isFile -> throw FileUnavailableException("The selected file was moved or deleted.")
+                            !fileViewState.file.canRead() -> throw FileUnavailableException("The selected file is no longer readable.")
+                            currentFileLength < fileViewState.fileLength -> throw FileUnavailableException("The selected file was shortened.")
+                        }
+                        val currentLastModifiedMillis = fileViewState.file.lastModified()
+                        val isFileContentChanged = currentFileLength != fileViewState.fileLength ||
+                            currentLastModifiedMillis != lastModifiedMillis
 
-                    fileViewState.fileLength = currentFileLength
-                    lastModifiedMillis = currentLastModifiedMillis
-                    filePager.moveToTheLastRow()
-                    filePager.moveToPrevRow(rows = (filePager.numOfRowsInViewport - 3L).coerceAtLeast(0L))
-                    onNavigate(filePager.viewportStartBytePosition)
-                    if (isFileContentChanged) {
-                        onDocumentContentChanged()
+                        fileViewState.fileLength = currentFileLength
+                        lastModifiedMillis = currentLastModifiedMillis
+                        filePager.moveToTheLastRow()
+                        filePager.moveToPrevRow(rows = (filePager.numOfRowsInViewport - 3L).coerceAtLeast(0L))
+                        onNavigate(filePager.viewportStartBytePosition)
+                        if (isFileContentChanged) {
+                            onDocumentContentChanged()
+                        }
+                        delay(1.seconds().millis)
                     }
-                    delay(1.seconds().millis)
+                } catch (e: FileUnavailableException) {
+                    e.printStackTrace()
+                    onPagerReady(null)
+                    onFileUnavailable(e.message ?: "The selected file is no longer available.")
                 }
             }
         }

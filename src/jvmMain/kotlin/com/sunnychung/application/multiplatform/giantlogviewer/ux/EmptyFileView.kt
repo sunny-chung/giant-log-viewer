@@ -1,4 +1,4 @@
-﻿package com.sunnychung.application.multiplatform.giantlogviewer.ux
+package com.sunnychung.application.multiplatform.giantlogviewer.ux
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,7 +28,7 @@ import com.sunnychung.application.multiplatform.giantlogviewer.ux.local.LocalCol
 import com.sunnychung.application.multiplatform.giantlogviewer.ux.local.LocalFont
 
 @Composable
-fun EmptyFileView(modifier: Modifier = Modifier, onOpenFileClick: () -> Unit = {}) {
+fun EmptyFileView(modifier: Modifier = Modifier, errorMessage: String? = null, onOpenFileClick: () -> Unit = {}) {
     val colors = LocalColor.current
     Box(modifier.fillMaxSize().padding(32.dp)) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.Center)) {
@@ -49,6 +49,20 @@ fun EmptyFileView(modifier: Modifier = Modifier, onOpenFileClick: () -> Unit = {
                     fontWeight = FontWeight.Medium,
                 ),
             )
+            errorMessage?.let {
+                Spacer(Modifier.height(18.dp))
+                BasicText(
+                    text = it,
+                    style = TextStyle(
+                        color = colors.bigTextWarning,
+                        fontSize = 15.sp,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 1.3.em,
+                        fontFamily = LocalFont.current.normalFontFamily,
+                        fontWeight = FontWeight.Medium,
+                    ),
+                )
+            }
             Spacer(Modifier.height(29.dp))
             OpenFileButton(onClick = onOpenFileClick)
         }
