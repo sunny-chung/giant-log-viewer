@@ -43,7 +43,12 @@ jobs:
           java-version: '21'
       - run: ./gradlew clean createReleaseDistributable
       - run: pushd ./build/compose/binaries && dir && cd main-release && dir && popd
-      - run: pushd ./build/compose/binaries/main-release/app && dir && tar -acf "app.zip" "Giant Log Viewer" && move "app.zip" "../../../../../artifact-unsigned.zip" && popd
+      - run: pushd ./build/compose/binaries/main-release/app && dir && tar -acf "app.zip" "Giant Log Viewer" && move "app.zip" "../../../../../GiantLogViewer-${{ github.ref_name }}-windows-${{ runner.arch }}-unsigned.zip" && popd
+      - uses: softprops/action-gh-release@v1
+        with:
+          files: "GiantLogViewer-${{ github.ref_name }}-windows-${{ runner.arch }}-unsigned.zip"
+          draft: true
+      - run: mv "./GiantLogViewer-${{ github.ref_name }}-windows-${{ runner.arch }}-unsigned.zip" "artifact-unsigned.zip"
       - run: mkdir -p ./signed
       - id: upload-unsigned-artifact
         uses: actions/upload-artifact@v4
